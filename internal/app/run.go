@@ -18,8 +18,6 @@ import (
 	catalogplacement "github.com/dcm-project/control-plane/internal/catalog/placement"
 	catalogservice "github.com/dcm-project/control-plane/internal/catalog/service"
 	catalogstore "github.com/dcm-project/control-plane/internal/catalog/store"
-	placementserver "github.com/dcm-project/control-plane/internal/placement/api/server"
-	placementhandlers "github.com/dcm-project/control-plane/internal/placement/handlers/v1alpha1"
 	placementlogging "github.com/dcm-project/control-plane/internal/placement/logging"
 	placementpolicy "github.com/dcm-project/control-plane/internal/placement/policy"
 	placementservice "github.com/dcm-project/control-plane/internal/placement/service"
@@ -94,16 +92,8 @@ func Run() int {
 	spProviderService := spprovidersvc.NewProviderService(spDataStore)
 	spInstanceService := sprmsvc.NewInstanceService(spDataStore, nil)
 
-	policyClient, err := buildPolicyClient(cfg, evaluationService)
-	if err != nil {
-		slog.Error("Failed to initialize policy client", "error", err)
-		return 1
-	}
-	sprmClient, err := buildSPRMClient(cfg, spInstanceService)
-	if err != nil {
-		slog.Error("Failed to initialize SPRM client", "error", err)
-		return 1
-	}
+	policyClient := placementpolicy.NewServiceClient(evaluationService)
+	sprmClient := placementsprm.NewServiceClient(spInstanceService)
 
 	placementService := placementservice.NewPlacementService(placementDataStore, policyClient, sprmClient)
 	pmClient, err := buildPlacementClient(cfg, placementService, logger)
@@ -170,7 +160,6 @@ func Run() int {
 
 	router := newRouter(RouteHandlers{
 		Catalog:    cataloghandlers.NewHandler(catalogSvc, logger),
-		Placement:  placementhandlers.NewHandler(placementService),
 		Policy:     policyhandlers.NewPolicyHandler(policyService),
 		SPProvider: spproviderhandler.NewHandler(spProviderService),
 		SPRM:       sprmhandler.NewHandler(spInstanceService),
@@ -210,7 +199,6 @@ func Run() int {
 
 type RouteHandlers struct {
 	Catalog    catalogserver.StrictServerInterface
-	Placement  placementserver.StrictServerInterface
 	Policy     policyserver.StrictServerInterface
 	SPProvider spproviderserver.StrictServerInterface
 	SPRM       sprmserver.StrictServerInterface
@@ -229,11 +217,6 @@ func newRouter(h RouteHandlers) chi.Router {
 
 	catalogserver.HandlerFromMuxWithBaseURL(
 		catalogserver.NewStrictHandler(h.Catalog, nil),
-		router,
-		baseURL,
-	)
-	placementserver.HandlerFromMuxWithBaseURL(
-		placementserver.NewStrictHandler(h.Placement, nil),
 		router,
 		baseURL,
 	)
@@ -262,20 +245,6 @@ func buildPlacementClient(cfg *Config, svc *placementservice.PlacementService, l
 		return catalogplacement.NewClient(url, cfg.Wiring.PlacementManagerTimeout, logger)
 	}
 	return catalogplacement.NewLocalClient(svc, logger), nil
-}
-
-func buildPolicyClient(cfg *Config, eval policyservice.EvaluationService) (placementpolicy.Client, error) {
-	if url := strings.TrimSpace(cfg.Wiring.PolicyEvaluationURL); url != "" {
-		return placementpolicy.NewClient(url, cfg.Wiring.PolicyEvaluationTimeout)
-	}
-	return placementpolicy.NewLocalClient(eval), nil
-}
-
-func buildSPRMClient(cfg *Config, instances *sprmsvc.InstanceService) (placementsprm.Client, error) {
-	if url := strings.TrimSpace(cfg.Wiring.SPResourceManagerURL); url != "" {
-		return placementsprm.NewClient(url, cfg.Wiring.SPResourceManagerTimeout)
-	}
-	return placementsprm.NewLocalClient(instances), nil
 }
 
 func initLogger(level string) *slog.Logger {

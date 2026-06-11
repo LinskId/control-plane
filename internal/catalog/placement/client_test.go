@@ -12,8 +12,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	pmclient "github.com/dcm-project/control-plane/pkg/placement/client"
-
 	"github.com/dcm-project/control-plane/internal/catalog/placement"
 )
 
@@ -22,7 +20,6 @@ func newTestClient(serverURL string) placement.Client {
 		serverURL,
 		10*time.Second,
 		slog.Default(),
-		pmclient.WithHTTPClient(http.DefaultClient),
 	)
 	Expect(err).ToNot(HaveOccurred())
 	return client
@@ -50,6 +47,7 @@ var _ = Describe("Placement Client", func() {
 			BeforeEach(func() {
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					Expect(r.Method).To(Equal(http.MethodPost))
+					Expect(r.URL.Path).To(Equal("/api/v1alpha1/resources"))
 					Expect(r.URL.Query().Get("id")).To(Equal("my-resource"))
 
 					var body map[string]any
@@ -84,6 +82,7 @@ var _ = Describe("Placement Client", func() {
 		Context("when no ID is provided", func() {
 			BeforeEach(func() {
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					Expect(r.URL.Path).To(Equal("/api/v1alpha1/resources"))
 					Expect(r.URL.Query().Get("id")).To(BeEmpty())
 
 					w.Header().Set("Content-Type", "application/json")
@@ -187,6 +186,7 @@ var _ = Describe("Placement Client", func() {
 			BeforeEach(func() {
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					Expect(r.Method).To(Equal(http.MethodPost))
+					Expect(r.URL.Path).To(Equal("/api/v1alpha1/resources/old-resource-id:rehydrate"))
 
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
@@ -277,6 +277,7 @@ var _ = Describe("Placement Client", func() {
 			BeforeEach(func() {
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					Expect(r.Method).To(Equal(http.MethodDelete))
+					Expect(r.URL.Path).To(Equal("/api/v1alpha1/resources/pm-resource-id"))
 					w.WriteHeader(http.StatusNoContent)
 				}))
 				client = newTestClient(server.URL)

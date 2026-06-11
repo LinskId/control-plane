@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	apiv1alpha1 "github.com/dcm-project/control-plane/api/placement/v1alpha1"
 	"github.com/dcm-project/control-plane/internal/placement/logging"
 	"github.com/dcm-project/control-plane/internal/placement/policy"
 	"github.com/dcm-project/control-plane/internal/placement/sprm"
 	"github.com/dcm-project/control-plane/internal/placement/store"
 	"github.com/dcm-project/control-plane/internal/placement/store/model"
+	"github.com/dcm-project/control-plane/internal/placement/types"
 	"github.com/google/uuid"
 )
 
@@ -35,7 +35,7 @@ func NewPlacementService(store store.Store, policyClient policy.Client, sprmClie
 }
 
 // CreateResource creates a new placement request.
-func (s *PlacementService) CreateResource(ctx context.Context, req *apiv1alpha1.Resource, queryId *string) (*apiv1alpha1.Resource, error) {
+func (s *PlacementService) CreateResource(ctx context.Context, req *types.Resource, queryId *string) (*types.Resource, error) {
 	log := logging.FromContext(ctx)
 
 	// Get or Generate ID
@@ -132,73 +132,6 @@ func (s *PlacementService) CreateResource(ctx context.Context, req *apiv1alpha1.
 	return storeModelToResource(created), nil
 }
 
-// GetResource retrieves a placement request by ID.
-func (s *PlacementService) GetResource(ctx context.Context, requestID string) (*apiv1alpha1.Resource, error) {
-	log := logging.FromContext(ctx)
-	log.Debug("Getting resource", "resource_id", requestID)
-
-	request, err := s.store.Resource().Get(ctx, requestID)
-	if err != nil {
-		if errors.Is(err, store.ErrResourceNotFound) {
-			return nil, NewNotFoundError(fmt.Sprintf("resource %s not found", requestID))
-		}
-		log.Error("Failed to get resource from store", "resource_id", requestID, "error", err)
-		return nil, NewInternalError(fmt.Sprintf("failed to retrieve resource: %v", err))
-	}
-
-	log.Debug("Resource retrieved", "resource_id", requestID)
-	return storeModelToResource(request), nil
-}
-
-// ListResources returns placement requests with optional filtering and pagination.
-func (s *PlacementService) ListResources(ctx context.Context, providerName *string, maxPageSize *int, pageToken *string) (*apiv1alpha1.ResourceList, error) {
-	log := logging.FromContext(ctx)
-	log.Debug("Listing resources",
-		"provider_filter", providerName,
-		"page_size", maxPageSize,
-	)
-
-	opts := &store.ResourceListOptions{
-		ProviderName: providerName,
-	}
-
-	// Apply max page size
-	if maxPageSize != nil {
-		if *maxPageSize > 0 && *maxPageSize <= 100 {
-			opts.PageSize = *maxPageSize
-		} else {
-			return nil, NewValidationError("page size must be between 1 and 100")
-		}
-	}
-
-	// Apply page token
-	if pageToken != nil && *pageToken != "" {
-		opts.PageToken = pageToken
-	}
-
-	// Get resources from store
-	result, err := s.store.Resource().List(ctx, opts)
-	if err != nil {
-		log.Error("Failed to list resources from store", "error", err)
-		return nil, NewInternalError(fmt.Sprintf("failed to list resources: %v", err))
-	}
-
-	// Convert to API types
-	resources := make([]apiv1alpha1.Resource, len(result.Resources))
-	for i, resource := range result.Resources {
-		resources[i] = *storeModelToResource(&resource)
-	}
-
-	log.Debug("Resources listed",
-		"count", len(resources),
-		"has_next_page", result.NextPageToken != nil,
-	)
-	return &apiv1alpha1.ResourceList{
-		Resources:     resources,
-		NextPageToken: result.NextPageToken,
-	}, nil
-}
-
 // DeleteResource removes a placement request by ID.
 func (s *PlacementService) DeleteResource(ctx context.Context, requestID string) error {
 	log := logging.FromContext(ctx)
@@ -246,7 +179,7 @@ func (s *PlacementService) DeleteResource(ctx context.Context, requestID string)
 // RehydrateResource re-evaluates an existing resource against current policies
 // and creates a new resource with the given newResourceID. The old resource is
 // deleted after the new one is successfully provisioned.
-func (s *PlacementService) RehydrateResource(ctx context.Context, resourceID, newResourceID string) (*apiv1alpha1.Resource, error) {
+func (s *PlacementService) RehydrateResource(ctx context.Context, resourceID, newResourceID string) (*types.Resource, error) {
 	log := logging.FromContext(ctx)
 	log.Debug("Rehydrating resource",
 		"resource_id", resourceID,
