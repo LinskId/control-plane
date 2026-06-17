@@ -13,10 +13,15 @@ $(error No supported container engine found. Please install podman or docker, or
 endif
 
 COMPOSE_FILE := deploy/compose.yaml
+COMPOSE_PROJECT_NAME ?= control-plane
+COMPOSE_NETWORK := $(COMPOSE_PROJECT_NAME)_default
+PROFILES ?= providers
 
 COMPOSE ?= $(shell command -v podman-compose >/dev/null 2>&1 && echo podman-compose || \
 	(command -v docker-compose >/dev/null 2>&1 && echo docker-compose || \
 	(echo "$(CONTAINER_ENGINE) compose")))
+
+export COMPOSE_PROJECT_NAME
 
 CONTAINER_IMAGE_NAME ?= quay.io/dcm-project/$(BINARY_NAME)
 CONTAINER_IMAGE_TAG ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -41,12 +46,42 @@ run:
 run-dev:
 	go run ./cmd/$(BINARY_NAME)
 
-# Local dev stack: Postgres, NATS, and control-plane (see deploy/compose.yaml).
+# Platform stack: Postgres, NATS, control-plane, and dcm-ui (see deploy/compose.yaml).
 compose-up:
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build
 
+# Platform stack with optional service providers (see deploy/RUN.md).
+compose-up-with-providers:
+	$(COMPOSE) -f $(COMPOSE_FILE) --profile $(PROFILES) up -d --build
+
+# Tear down the compose stack. Kind (or other externals) joined to the compose
+# network block "compose down" from removing it — disconnect them first.
+# Network cleanup uses podman- or docker-specific commands (not portable flags).
 compose-down:
-	$(COMPOSE) -f $(COMPOSE_FILE) down -v
+	@for network in deploy_default $(COMPOSE_NETWORK); do \
+		if [ "$(CONTAINER_ENGINE)" = podman ]; then \
+			if podman network exists "$$network" 2>/dev/null; then \
+				for c in $$(podman ps -a --filter network=$$network -q 2>/dev/null); do \
+					podman network disconnect -f "$$network" "$$c" 2>/dev/null || true; \
+				done; \
+			fi; \
+		elif [ "$(CONTAINER_ENGINE)" = docker ]; then \
+			if docker network inspect "$$network" >/dev/null 2>&1; then \
+				for c in $$(docker ps -a --filter network=$$network -q 2>/dev/null); do \
+					docker network disconnect "$$network" "$$c" --force 2>/dev/null || true; \
+				done; \
+			fi; \
+		fi; \
+	done; \
+	COMPOSE_PROJECT_NAME=deploy $(COMPOSE) -f $(COMPOSE_FILE) down -v --remove-orphans 2>/dev/null || true; \
+	$(COMPOSE) -f $(COMPOSE_FILE) down -v --remove-orphans; \
+	for network in deploy_default $(COMPOSE_NETWORK); do \
+		if [ "$(CONTAINER_ENGINE)" = podman ]; then \
+			podman network rm -f "$$network" 2>/dev/null || true; \
+		elif [ "$(CONTAINER_ENGINE)" = docker ]; then \
+			docker network rm "$$network" 2>/dev/null || true; \
+		fi; \
+	done
 
 image-build:
 	$(CONTAINER_ENGINE) build -f Containerfile -t $(CONTAINER_IMAGE_NAME):$(CONTAINER_IMAGE_TAG) .
@@ -74,5 +109,5 @@ test:
 tidy:
 	go mod tidy
 
-.PHONY: build run run-dev compose-up compose-down image-build clean fmt vet lint test \
-	test-catalog test-placement test-policy test-sp tidy
+.PHONY: build run run-dev compose-up compose-up-with-providers compose-down image-build \
+	clean fmt vet lint test test-catalog test-placement test-policy test-sp tidy
