@@ -31,7 +31,7 @@ var _ = Describe("ServiceType Service", func() {
 			Logger: logger.Discard,
 		})
 		Expect(err).ToNot(HaveOccurred())
-		err = db.AutoMigrate(&model.ServiceType{})
+		err = db.AutoMigrate(&model.ServiceType{}, &model.CatalogItem{})
 		Expect(err).ToNot(HaveOccurred())
 		str = store.NewStore(db, slog.Default())
 		svc, err = service.NewService(str, &mockPMClient{}, config.DefaultSeedConfig(), slog.Default())
@@ -93,6 +93,20 @@ var _ = Describe("ServiceType Service", func() {
 				result, err := svc.ServiceType().Create(ctx, req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result.ServiceType).To(Equal("database"))
+			})
+
+			It("should create a service type with 'storage'", func() {
+				req := &service.CreateServiceTypeRequest{
+					ApiVersion:  "v1alpha1",
+					ServiceType: "storage",
+					Spec:        map[string]any{"capacity": "100Gi"},
+				}
+
+				result, err := svc.ServiceType().Create(ctx, req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).ToNot(BeNil())
+				Expect(result.ServiceType).To(Equal("storage"))
+				Expect(result.Spec).To(HaveKey("capacity"))
 			})
 		})
 
@@ -256,6 +270,18 @@ var _ = Describe("ServiceType Service", func() {
 	})
 
 	Describe("Get", func() {
+		It("should retrieve the seeded storage service type", func() {
+			err := svc.Seed(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
+			result, err := svc.ServiceType().Get(ctx, "storage")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).ToNot(BeNil())
+			Expect(result.ServiceType).To(Equal("storage"))
+			Expect(*result.Path).To(Equal("service-types/storage"))
+			Expect(result.Spec).To(HaveKey("capacity"))
+		})
+
 		It("should retrieve a service type", func() {
 			createReq := &service.CreateServiceTypeRequest{
 				ApiVersion:  "v1alpha1",
@@ -280,6 +306,21 @@ var _ = Describe("ServiceType Service", func() {
 	})
 
 	Describe("List", func() {
+		It("lists seeded service types including storage", func() {
+			err := svc.Seed(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
+			result, err := svc.ServiceType().List(ctx, &service.ServiceTypeListOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.ServiceTypes).To(HaveLen(6))
+
+			types := make([]string, len(result.ServiceTypes))
+			for i, st := range result.ServiceTypes {
+				types[i] = st.ServiceType
+			}
+			Expect(types).To(ContainElement("storage"))
+		})
+
 		It("should list service types", func() {
 			for _, st := range []string{"vm", "container"} {
 				_, err := svc.ServiceType().Create(ctx, &service.CreateServiceTypeRequest{

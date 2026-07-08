@@ -248,4 +248,78 @@ var _ = Describe("ServiceType Store", func() {
 			Expect(err).To(MatchError(store.ErrInvalidPageToken))
 		})
 	})
+
+	Describe("SeedMissing", func() {
+		defaults := func() []model.ServiceType {
+			return []model.ServiceType{
+				{ID: "vm", ApiVersion: "v1alpha1", ServiceType: "vm", Spec: map[string]any{}, Path: "service-types/vm"},
+				{ID: "storage", ApiVersion: "v1alpha1", ServiceType: "storage", Spec: map[string]any{"capacity": ""}, Path: "service-types/storage"},
+			}
+		}
+
+		It("inserts all defaults when the table is empty", func() {
+			ctx := context.Background()
+			err := serviceTypeStore.SeedMissing(ctx, defaults())
+			Expect(err).ToNot(HaveOccurred())
+
+			var count int64
+			err = db.Model(&model.ServiceType{}).Count(&count).Error
+			Expect(err).ToNot(HaveOccurred())
+			Expect(count).To(Equal(int64(2)))
+		})
+
+		It("inserts only missing defaults when some rows already exist", func() {
+			ctx := context.Background()
+			_, err := serviceTypeStore.Create(ctx, model.ServiceType{
+				ID: "vm", ApiVersion: "v1alpha1", ServiceType: "vm", Spec: map[string]any{}, Path: "service-types/vm",
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			err = serviceTypeStore.SeedMissing(ctx, defaults())
+			Expect(err).ToNot(HaveOccurred())
+
+			var count int64
+			err = db.Model(&model.ServiceType{}).Count(&count).Error
+			Expect(err).ToNot(HaveOccurred())
+			Expect(count).To(Equal(int64(2)))
+
+			storage, err := serviceTypeStore.Get(ctx, "storage")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(storage.ServiceType).To(Equal("storage"))
+		})
+
+		It("skips defaults already present by service_type", func() {
+			ctx := context.Background()
+			_, err := serviceTypeStore.Create(ctx, model.ServiceType{
+				ID: "custom-storage", ApiVersion: "v1alpha1", ServiceType: "storage",
+				Spec: map[string]any{}, Path: "service-types/custom-storage",
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			err = serviceTypeStore.SeedMissing(ctx, defaults())
+			Expect(err).ToNot(HaveOccurred())
+
+			var count int64
+			err = db.Model(&model.ServiceType{}).Count(&count).Error
+			Expect(err).ToNot(HaveOccurred())
+			Expect(count).To(Equal(int64(2)))
+
+			_, err = serviceTypeStore.Get(ctx, "storage")
+			Expect(err).To(Equal(store.ErrServiceTypeNotFound))
+		})
+
+		It("is idempotent", func() {
+			ctx := context.Background()
+			err := serviceTypeStore.SeedMissing(ctx, defaults())
+			Expect(err).ToNot(HaveOccurred())
+
+			err = serviceTypeStore.SeedMissing(ctx, defaults())
+			Expect(err).ToNot(HaveOccurred())
+
+			var count int64
+			err = db.Model(&model.ServiceType{}).Count(&count).Error
+			Expect(err).ToNot(HaveOccurred())
+			Expect(count).To(Equal(int64(2)))
+		})
+	})
 })
