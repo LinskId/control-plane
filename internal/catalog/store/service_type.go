@@ -39,6 +39,7 @@ type ServiceTypeStore interface {
 	Get(ctx context.Context, id string) (*model.ServiceType, error)
 	GetByServiceType(ctx context.Context, serviceType string) (*model.ServiceType, error)
 	SeedIfEmpty(ctx context.Context, items []model.ServiceType) error
+	SeedMissing(ctx context.Context, items []model.ServiceType) error
 }
 
 type serviceTypeStore struct {
@@ -184,6 +185,35 @@ func (s *serviceTypeStore) SeedIfEmpty(ctx context.Context, items []model.Servic
 		}
 		if inserted > 0 {
 			s.logger.InfoContext(ctx, "Seeded default service types", "count", inserted)
+		}
+		return nil
+	})
+}
+
+// SeedMissing inserts default service types that are not already present.
+// A row is considered present when either id or service_type matches an existing row.
+// Existing rows are never updated.
+func (s *serviceTypeStore) SeedMissing(ctx context.Context, items []model.ServiceType) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var inserted int64
+		for _, m := range items {
+			var n int64
+			if err := tx.Model(&model.ServiceType{}).
+				Where("id = ? OR service_type = ?", m.ID, m.ServiceType).
+				Count(&n).Error; err != nil {
+				return err
+			}
+			if n > 0 {
+				continue
+			}
+			result := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "id"}}, DoNothing: true}).Create(&m)
+			if err := result.Error; err != nil {
+				return err
+			}
+			inserted += result.RowsAffected
+		}
+		if inserted > 0 {
+			s.logger.InfoContext(ctx, "Seeded missing default service types", "count", inserted)
 		}
 		return nil
 	})

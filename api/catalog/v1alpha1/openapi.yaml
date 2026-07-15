@@ -13,7 +13,7 @@ info:
     ## Resources
 
     - **ServiceTypes**: Define templates for different types of infrastructure services
-      (VM, container, database, Kubernetes cluster, or custom types)
+      (VM, container, database, Kubernetes cluster, storage volume, or custom types)
     - **CatalogItems**: Curated service offerings with specific field configurations
       and constraints
   contact: {}
@@ -641,7 +641,7 @@ components:
           type: string
           description: |
             Classification of the service type.
-            Common values include: vm, container, database, cluster.
+            Common values include: vm, container, database, cluster, storage.
             Administrators may define custom types beyond these.
           example: vm
 
@@ -671,6 +671,7 @@ components:
             - Container: image, resources, process, network
             - Database: engine, version, resources
             - Cluster: version, nodes (control plane, workers)
+            - Storage: capacity
 
             The structure varies based on the service_type and schema_version.
           example:
@@ -813,7 +814,7 @@ components:
           description: |
             The Service type for this resource.
             Immutable after creation.
-            (vm, container, database, cluster).
+            (vm, container, database, cluster, storage).
           example: vm
 
         requires_resources:

@@ -1,0 +1,79 @@
+openapi: 3.0.4
+
+info:
+  title: DCM Storage Specification
+  description: |
+    Provider-agnostic storage volume specification.
+
+    This schema defines minimal portable fields for standalone persistent
+    volumes (block or file storage) across platforms.
+
+    Platform-specific configuration (Kubernetes StorageClass, volume mode,
+    access mode) should be specified via provider_hints.
+  version: v1alpha1
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+paths: {}
+
+components:
+  schemas:
+    StorageSpec:
+      type: object
+      description: |
+        Provider-agnostic storage volume specification.
+
+        Includes common fields (service_type, metadata, provider_hints)
+        plus the portable capacity field.
+
+        Providers translate this abstract specification to their native format.
+      allOf:
+        - $ref: '../common.yaml#/components/schemas/CommonFields'
+        - type: object
+          required:
+            - capacity
+          properties:
+            capacity:
+              type: string
+              description: |
+                Volume size using Kubernetes-style quantity suffixes.
+
+                Examples: 100Gi, 1Ti, 500G
+              pattern: '^[0-9]+(\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$'
+              example: 100Gi
+
+          additionalProperties: true
+
+    KubernetesProviderHints:
+      type: object
+      description: |
+        Kubernetes-specific PVC settings supplied under
+        provider_hints.kubernetes.
+
+        Catalog administrators typically set these as non-editable defaults.
+      additionalProperties: false
+      properties:
+        storage_class:
+          type: string
+          description: StorageClass name (overrides SP default)
+          example: gp3-csi
+        volume_mode:
+          type: string
+          description: PVC volume mode
+          enum:
+            - Filesystem
+            - Block
+          example: Filesystem
+        access_mode:
+          type: string
+          description: |
+            PVC access mode.
+
+            ReadWriteOnce is typical for block storage; ReadWriteMany for
+            shared filesystem StorageClasses (e.g. CephFS, NFS).
+          enum:
+            - ReadWriteOnce
+            - ReadOnlyMany
+            - ReadWriteMany
+          example: ReadWriteOnce

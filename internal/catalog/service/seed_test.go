@@ -61,13 +61,49 @@ var _ = Describe("Seed", func() {
 				var serviceTypes []model.ServiceType
 				err = db.Find(&serviceTypes).Error
 				Expect(err).ToNot(HaveOccurred())
-				Expect(serviceTypes).To(HaveLen(5))
+				Expect(serviceTypes).To(HaveLen(6))
 
 				ids := make([]string, len(serviceTypes))
 				for i, st := range serviceTypes {
 					ids[i] = st.ID
 				}
-				Expect(ids).To(ConsistOf("three-tier-app-demo", "vm", "container", "database", "cluster"))
+				Expect(ids).To(ConsistOf("three-tier-app-demo", "vm", "container", "database", "cluster", "storage"))
+			})
+
+			It("inserts missing service types when upgrading a partially seeded database", func() {
+				ctx := context.Background()
+				legacyIDs := []string{"three-tier-app-demo", "vm", "container", "database", "cluster"}
+				for _, id := range legacyIDs {
+					st := model.ServiceType{
+						ID:          id,
+						ApiVersion:  "v1alpha1",
+						ServiceType: id,
+						Spec:        map[string]any{},
+						Path:        "service-types/" + id,
+					}
+					_, err := dataStore.ServiceType().Create(ctx, st)
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				err := svc.Seed(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				var count int64
+				err = db.Model(&model.ServiceType{}).Count(&count).Error
+				Expect(err).ToNot(HaveOccurred())
+				Expect(count).To(Equal(int64(6)))
+
+				storage, err := dataStore.ServiceType().Get(ctx, "storage")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(storage.ServiceType).To(Equal("storage"))
+				Expect(storage.Spec).To(HaveKey("capacity"))
+
+				err = svc.Seed(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = db.Model(&model.ServiceType{}).Count(&count).Error
+				Expect(err).ToNot(HaveOccurred())
+				Expect(count).To(Equal(int64(6)))
 			})
 
 			DescribeTable("seeds service type with correct spec keys",
@@ -90,6 +126,7 @@ var _ = Describe("Seed", func() {
 				Entry("container", "container", []string{"image", "resources", "process", "network"}),
 				Entry("database", "database", []string{"engine", "version", "resources"}),
 				Entry("cluster", "cluster", []string{"version"}),
+				Entry("storage", "storage", []string{"capacity"}),
 			)
 		})
 

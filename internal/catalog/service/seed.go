@@ -13,7 +13,7 @@ import (
 // Seed ensures required service types and default catalog items exist.
 func (s *service) Seed(ctx context.Context) error {
 	s.logger.InfoContext(ctx, "Seeding database with defaults")
-	if err := s.store.ServiceType().SeedIfEmpty(ctx, defaultServiceTypes()); err != nil {
+	if err := s.store.ServiceType().SeedMissing(ctx, defaultServiceTypes()); err != nil {
 		return err
 	}
 	return s.store.CatalogItem().SeedIfEmpty(ctx, s.defaultCatalogItems())
@@ -77,6 +77,15 @@ func defaultServiceTypes() []model.ServiceType {
 				"version": "",
 			},
 			Path: "service-types/cluster",
+		},
+		{
+			ID:          "storage",
+			ApiVersion:  "v1alpha1",
+			ServiceType: "storage",
+			Spec: map[string]any{
+				"capacity": "",
+			},
+			Path: "service-types/storage",
 		},
 	}
 }
