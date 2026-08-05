@@ -88,6 +88,9 @@ var (
 	// ErrCELServiceTypeOutputNotFound indicates the referenced output is not declared on the source service type
 	ErrCELServiceTypeOutputNotFound = errors.New("CEL reference output not found on service type")
 
+	// ErrCELRequiresResourceMissing indicates a CEL reference targets a resource not listed in requires_resources
+	ErrCELRequiresResourceMissing = errors.New("CEL reference resource must be listed in requires_resources")
+
 	// ErrPlacementManagerPolicyRejected indicates the Placement Manager rejected the request due to policy (406)
 	ErrPlacementManagerPolicyRejected = errors.New("placement manager request rejected by policy engine")
 
@@ -109,6 +112,6 @@ var (
 	// ErrCatalogItemInstanceConflict indicates a concurrent modification was detected
 	ErrCatalogItemInstanceConflict = errors.New("catalog item instance was modified concurrently")
 
-	// ErrCatalogItemInstanceResourceIDsEmpty indicates the instance has no placement resource IDs
-	ErrCatalogItemInstanceResourceIDsEmpty = errors.New("catalog item instance has no resource IDs")
+	// ErrCatalogItemInstanceRunIDEmpty indicates the instance has no placement run id
+	ErrCatalogItemInstanceRunIDEmpty = errors.New("catalog item instance has no run id")
 )
