@@ -2,6 +2,7 @@
 #
 # Image version: defaults to :main. Pin with CONTROL_PLANE_VERSION in .env.
 # Local dev: `make compose-up` builds control-plane from the repo Containerfile.
+# control-plane uses pull_policy: never so that build is not replaced by Quay :main.
 #
 # Credentials: set POSTGRES_USER and POSTGRES_PASSWORD in the environment or in
 # a .env file (see deploy/.env.example). Defaults are for local dev only.
@@ -70,7 +71,7 @@ services:
       context: ..
       dockerfile: Containerfile
     image: quay.io/dcm-project/control-plane:${CONTROL_PLANE_VERSION:-main}
-    pull_policy: always
+    pull_policy: never
     environment:
       <<: *db-common
       BIND_ADDRESS: ":8080"
@@ -151,6 +152,33 @@ services:
       - "8080"
     volumes:
       - ${ACM_CLUSTER_SP_KUBECONFIG:-~/.kube/config}:/kubeconfig:ro,z
+    depends_on:
+      control-plane:
+        condition: service_started
+      nats:
+        condition: service_started
+
+  k8s-storage-service-provider:
+    profiles: ["providers", "storage"]
+    build:
+      context: ../../k8s-storage-service-provider
+      dockerfile: Containerfile
+    image: quay.io/dcm-project/k8s-storage-service-provider:${K8S_STORAGE_SERVICE_PROVIDER_VERSION:-main}
+    pull_policy: never
+    environment:
+      SP_NAME: ${K8S_STORAGE_SP_NAME:-k8s-storage-provider}
+      SP_ENDPOINT: "http://k8s-storage-service-provider:8080"
+      SP_SERVER_ADDRESS: ":8080"
+      DCM_REGISTRATION_URL: *dcm-registration-url
+      SP_NATS_URL: "nats://nats:4222"
+      SP_K8S_NAMESPACE: ${K8S_STORAGE_SP_NAMESPACE:-default}
+      SP_K8S_KUBECONFIG: /kubeconfig
+      SP_K8S_DEFAULT_STORAGE_CLASS: ${K8S_STORAGE_SP_DEFAULT_STORAGE_CLASS:-}
+      SP_K8S_DEFAULT_ACCESS_MODE: ${K8S_STORAGE_SP_DEFAULT_ACCESS_MODE:-ReadWriteOnce}
+    expose:
+      - "8080"
+    volumes:
+      - ${K8S_STORAGE_SP_KUBECONFIG:-~/.kube/config}:/kubeconfig:ro,z
     depends_on:
       control-plane:
         condition: service_started
