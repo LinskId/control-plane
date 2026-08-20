@@ -364,6 +364,7 @@ var _ = Describe("Nested Map Utilities", func() {
 			Entry("unclosed bracket", "storage.disks[0.name"),
 			Entry("nested indices", "storage.disks[0][1].name"),
 			Entry("empty name", "storage.[0].name"),
+			Entry("index too large", "storage.disks[1025].name"),
 		)
 	})
 })

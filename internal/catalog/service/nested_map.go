@@ -18,6 +18,9 @@ type pathSegment struct {
 	hasIndex bool
 }
 
+// maxPathArrayIndex caps slice growth from path indexes (avoids OOM / MaxInt+1 panic).
+const maxPathArrayIndex = 1024
+
 // parsePathSegment parses "key" or "key[n]"; malformed brackets return an error.
 func parsePathSegment(seg string) (pathSegment, error) {
 	if seg == "" {
@@ -39,6 +42,9 @@ func parsePathSegment(seg string) (pathSegment, error) {
 	idx, err := strconv.Atoi(seg[open+1 : close])
 	if err != nil || idx < 0 {
 		return pathSegment{}, fmt.Errorf("invalid path segment %q: index must be a non-negative integer", seg)
+	}
+	if idx > maxPathArrayIndex {
+		return pathSegment{}, fmt.Errorf("invalid path segment %q: index must be <= %d", seg, maxPathArrayIndex)
 	}
 	return pathSegment{name: seg[:open], index: idx, hasIndex: true}, nil
 }
@@ -205,7 +211,7 @@ func ensureSliceElementMap(parent map[string]any, name string, index int, pathSo
 	}
 	elem, ok := slice[index].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("path segment %q[%d] is not a map", pathSoFar, index)
+		return nil, fmt.Errorf("path segment %q is not a map", pathSoFar)
 	}
 	parent[name] = slice
 	return elem, nil
