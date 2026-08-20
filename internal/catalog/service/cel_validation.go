@@ -33,22 +33,13 @@ func parseCELReference(value string) (celReference, bool, error) {
 	}, true, nil
 }
 
-// serviceTypeOutputNames returns declared output field names from a service type.
-// Reads optional spec.outputs until outputs are formally defined on ServiceType.
-func serviceTypeOutputNames(st *model.ServiceType) map[string]bool {
-	outputs := make(map[string]bool)
-	raw, ok := st.Spec["outputs"]
-	if !ok {
-		return outputs
+// serviceTypeTemplateHasField reports whether fieldName exists on the service type template spec.
+func serviceTypeTemplateHasField(st *model.ServiceType, fieldName string) bool {
+	if st == nil || st.Spec == nil {
+		return false
 	}
-	m, ok := raw.(map[string]any)
-	if !ok {
-		return outputs
-	}
-	for name := range m {
-		outputs[name] = true
-	}
-	return outputs
+	_, err := getNestedValue(st.Spec, fieldName)
+	return err == nil
 }
 
 func validateCELReferenceValue(
@@ -91,13 +82,13 @@ func validateCELReferenceValue(
 		return ErrServiceTypeNotFound
 	}
 
-	outputs := serviceTypeOutputNames(sourceST)
-	if len(outputs) == 0 {
-		return fmt.Errorf("%w: service type %q has no declared outputs for %s.%s",
-			ErrCELServiceTypeOutputNotFound, source.ServiceType, ref.ResourceName, ref.OutputField)
-	}
-	if !outputs[ref.OutputField] {
-		return fmt.Errorf("%w: %s.%s", ErrCELServiceTypeOutputNotFound, ref.ResourceName, ref.OutputField)
+	// Interim check: field key presence on the service type template only.
+	// Enhancement #99 will add separate output definitions on the service type (parallel
+	// to input schemas); until then CEL cannot distinguish declared outputs from input
+	// fields (e.g. ${db.engine} passes if engine exists on the template).
+	if !serviceTypeTemplateHasField(sourceST, ref.OutputField) {
+		return fmt.Errorf("%w: service type %q has no field %q for %s.%s",
+			ErrCELServiceTypeOutputNotFound, source.ServiceType, ref.OutputField, ref.ResourceName, ref.OutputField)
 	}
 
 	return nil
