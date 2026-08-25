@@ -65,6 +65,25 @@ export K8S_CONTAINER_SP_NAME=my-provider
 export K8S_CONTAINER_SP_EXTERNAL_SVC_TYPE=LoadBalancer
 ```
 
+### K8s storage service provider
+
+To include the `k8s-storage-service-provider`, set the required environment variables and
+activate the `storage` profile:
+
+```bash
+export K8S_STORAGE_SP_KUBECONFIG="/path/to/kubeconfig"
+make compose-up-with-providers PROFILES=storage
+```
+
+Optionally override the provider name, namespace, and default PVC behavior:
+
+```bash
+export K8S_STORAGE_SP_NAME=my-storage-provider
+export K8S_STORAGE_SP_NAMESPACE=default
+export K8S_STORAGE_SP_DEFAULT_STORAGE_CLASS=ceph-rbd
+export K8S_STORAGE_SP_DEFAULT_ACCESS_MODE=ReadWriteOnce
+```
+
 ### ACM cluster service provider
 
 To include the `acm-cluster-service-provider`, set the required environment variables and
@@ -120,6 +139,7 @@ To start all providers at once, set the required environment variables and run:
 ```bash
 export KUBEVIRT_KUBECONFIG="/path/to/kubeconfig"
 export K8S_CONTAINER_SP_KUBECONFIG="/path/to/kubeconfig"
+export K8S_STORAGE_SP_KUBECONFIG="/path/to/kubeconfig"
 export ACM_CLUSTER_SP_KUBECONFIG="/path/to/kubeconfig"
 export ACM_CLUSTER_SP_PULL_SECRET="<base64-encoded-dockerconfigjson>"
 # BareMetal only:
@@ -134,6 +154,7 @@ three-tier demo SP). To start a single provider instead, pass `PROFILES=`:
 ```bash
 make compose-up-with-providers PROFILES=kubevirt
 make compose-up-with-providers PROFILES=k8s-container
+make compose-up-with-providers PROFILES=storage
 make compose-up-with-providers PROFILES=acm-cluster
 make compose-up-with-providers PROFILES=three-tier
 ```
@@ -253,6 +274,11 @@ the compose network (see [k8s-container-sp-kind.md](docs/k8s-container-sp-kind.m
 | `K8S_CONTAINER_SP_NAMESPACE`               | `default`                   | Kubernetes namespace for k8s containers                                                                     |
 | `K8S_CONTAINER_SP_NAME`                    | `k8s-container-provider`    | Provider name for the k8s-container-service-provider                                                        |
 | `K8S_CONTAINER_SP_EXTERNAL_SVC_TYPE`       | `NodePort`                  | Kubernetes Service type for external ports (`NodePort` or `LoadBalancer`)                                   |
+| `K8S_STORAGE_SP_KUBECONFIG`                | `~/.kube/config`            | Path to kubeconfig on the host for the k8s-storage-service-provider                                         |
+| `K8S_STORAGE_SP_NAMESPACE`                 | `default`                   | Kubernetes namespace used by the k8s-storage-service-provider                                               |
+| `K8S_STORAGE_SP_NAME`                      | `k8s-storage-provider`      | Provider name for the k8s-storage-service-provider                                                          |
+| `K8S_STORAGE_SP_DEFAULT_STORAGE_CLASS`     | _(empty)_                   | Optional fallback StorageClass when request hints do not set one                                            |
+| `K8S_STORAGE_SP_DEFAULT_ACCESS_MODE`       | `ReadWriteOnce`             | Optional fallback access mode when request hints do not set one                                             |
 | `ACM_CLUSTER_SP_KUBECONFIG`                | `~/.kube/config`            | Path to kubeconfig on the host for the acm-cluster-service-provider                                         |
 | `ACM_CLUSTER_SP_NAMESPACE`                 | `default`                   | Kubernetes namespace for ACM hosted clusters                                                                |
 | `ACM_CLUSTER_SP_NAME`                      | `acm-cluster-sp`            | Provider name for the acm-cluster-service-provider                                                          |
@@ -263,6 +289,7 @@ the compose network (see [k8s-container-sp-kind.md](docs/k8s-container-sp-kind.m
 | `CONTROL_PLANE_VERSION`                    | `main`                      | Image tag for control-plane monolith                                                                        |
 | `KUBEVIRT_SERVICE_PROVIDER_VERSION`        | `main`                      | Image tag for kubevirt-service-provider                                                                     |
 | `K8S_CONTAINER_SERVICE_PROVIDER_VERSION`   | `main`                      | Image tag for k8s-container-service-provider                                                                |
+| `K8S_STORAGE_SERVICE_PROVIDER_VERSION`     | `main`                      | Image tag for k8s-storage-service-provider                                                                  |
 | `ACM_CLUSTER_SERVICE_PROVIDER_VERSION`     | `main`                      | Image tag for acm-cluster-service-provider                                                                  |
 | `THREE_TIER_DEMO_SERVICE_PROVIDER_VERSION` | `main`                      | Image tag for three-tier-demo-service-provider                                                              |
 | `THREE_TIER_SP_NAME`                       | `three-tier-provider`       | Provider name for the three-tier-demo-service-provider                                                      |
