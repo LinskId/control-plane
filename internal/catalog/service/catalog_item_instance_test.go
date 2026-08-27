@@ -184,6 +184,11 @@ var _ = Describe("CatalogItemInstance Service", func() {
 		})
 		ensureCatalogItem(ctx, str, "small-vm", "vm")
 		ensureCatalogItem(ctx, str, "small-container", "container")
+		ensureServiceTypeWithSpec(ctx, str, "storage-st", "storage", map[string]any{
+			"capacity":    "",
+			"volume_name": "",
+		})
+		ensureCatalogItem(ctx, str, "small-storage", "storage")
 	})
 
 	AfterEach(func() {
@@ -602,6 +607,28 @@ var _ = Describe("CatalogItemInstance Service", func() {
 				Expect(capturedOldRunID).To(Equal(oldRunID))
 				Expect(capturedNewRunID).To(Equal(*result.RunId))
 				Expect(mockPM.rehydrateCalls).To(Equal(1))
+			})
+		})
+
+		Context("with storage catalog item", func() {
+			It("should create a storage catalog item instance and forward to placement", func() {
+				req := &service.CreateCatalogItemInstanceRequest{
+					ApiVersion:  "v1alpha1",
+					DisplayName: "My Storage Instance",
+					Spec: v1alpha1.CatalogItemInstanceSpec{
+						CatalogItemId: "small-storage",
+						UserValues:    []v1alpha1.UserValue{},
+					},
+				}
+
+				result, err := svc.CatalogItemInstance().Create(ctx, req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).ToNot(BeNil())
+				Expect(result.Spec.CatalogItemId).To(Equal("small-storage"))
+				Expect(mockPM.createCalls).To(Equal(1))
+				Expect(mockPM.lastCreateReq).ToNot(BeNil())
+				Expect(mockPM.lastCreateReq.Resources).To(HaveLen(1))
+				Expect(mockPM.lastCreateReq.Resources[0].Spec["service_type"]).To(Equal("storage"))
 			})
 		})
 	})
